@@ -1,0 +1,17 @@
+{
+  "name": "going-once",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A real-time party auction game",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1"
+  }
+}

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5f0">
+  <title>Going Once | The party auction game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .welcome h1 { font-size: 72px; }
+    .lot-title-row > div { min-width: 0; }
+    .lot-title-row h3, .lot-title-row p { overflow-wrap: anywhere; }
+    .auto-end-option { display: flex; align-items: flex-start; gap: 10px; margin: 20px 0 0; color: var(--ink); font-size: 12px; line-height: 1.5; letter-spacing: 0; }
+    .auto-end-option input { width: 17px; height: 17px; flex: none; margin: 1px 0 0; accent-color: var(--dark); }
+    .live-host-actions { margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .live-host-actions > span { color: var(--muted); font-size: 12px; }
+    .ready-actions { margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .ready-actions .button { min-height: 43px; }
+    .ready-note { color: var(--muted); font-size: 12px; margin: 20px 0 0; }
+    .stock-picker { border: 0; padding: 0; margin: 0; min-width: 0; }
+    .stock-picker legend { padding: 0; margin-bottom: 9px; color: #4d554c; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+    .stock-picker legend span { color: #a1a59b; font-weight: 500; }
+    .stock-images { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .stock-image { min-width: 0; padding: 0; border: 2px solid transparent; border-radius: 3px; background: #fff; text-align: left; overflow: hidden; }
+    .stock-image[aria-pressed="true"] { border-color: #547044; }
+    .stock-image img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: #dce5d8; }
+    .stock-image span { display: block; padding: 7px 8px; font-size: 11px; font-weight: 700; color: #596254; }
+    .image-upload { height: auto; padding: 8px; font-size: 12px; }
+    .image-upload::file-selector-button { border: 0; border-radius: 2px; padding: 8px 10px; margin-right: 10px; background: var(--dark); color: white; font: 700 11px var(--font); cursor: pointer; }
+    .upload-status { margin: 7px 0 0; color: #697664; font-size: 11px; overflow-wrap: anywhere; }
+    .image-preview { display: block; width: min(100%, 220px); max-height: 150px; margin-top: 10px; object-fit: contain; object-position: left; }
+    .bid-input-wrap span { padding: 0 0 0 10px; }
+    .result-dialog { width: min(420px, calc(100% - 36px)); max-height: calc(100% - 36px); border: 0; border-radius: 6px; padding: 32px; background: var(--paper); color: var(--ink); }
+    .result-dialog::backdrop { background: rgba(25, 33, 27, .7); }
+    .result-dialog-icon { width: 48px; height: 48px; display: grid; place-items: center; background: var(--green); color: var(--dark); border-radius: 50%; margin-bottom: 24px; }
+    .result-dialog-icon svg { width: 23px; }
+    .result-dialog h2 { font: 600 32px/1.1 var(--display); margin: 10px 0 14px; overflow-wrap: anywhere; }
+    .result-dialog p { line-height: 1.6; color: #70796d; overflow-wrap: anywhere; margin: 0 0 25px; }
+    .result-dialog .button { width: 100%; }
+    .leave-dialog-actions { display: flex; gap: 10px; }
+    .leave-dialog-actions .button { flex: 1; justify-content: center; }
+    .result-dialog .form-error { color: #b34f35; margin: 12px 0 0; }
+    @media (max-width: 900px) { .welcome h1 { font-size: 58px; } }
+    @media (max-width: 650px) { .welcome h1 { font-size: 48px; } }
+    @media (max-width: 380px) { .welcome h1 { font-size: 42px; } }
+  </style>
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Going Once home"><span class="brand-mark"><i data-lucide="gavel"></i></span><span>going<span class="brand-dot">.</span>once</span></a>
+    <div class="topbar-right"><span class="connection"><span class="status-dot"></span><span id="connection-label">Connecting</span></span><span class="topbar-divider"></span><span class="edition">THE PARTY AUCTION GAME</span></div>
+  </header>
+
+  <main>
+    <section id="welcome" class="welcome page-width">
+      <div class="welcome-copy">
+        <div class="eyebrow"><span class="eyebrow-dot"></span> THE AUCTION IS OPEN</div>
+        <h1>Good things<br>go to the <em>bold.</em></h1>
+        <p class="welcome-description">Bring your people, bring your game face. There are treasures to claim and bragging rights to win.</p>
+        <div class="entry-panel">
+          <div class="tabs" role="tablist" aria-label="Choose how to play">
+            <button class="tab active" role="tab" aria-selected="true" data-mode="join">Join a game</button>
+            <button class="tab" role="tab" aria-selected="false" data-mode="create">Host a game</button>
+          </div>
+          <form id="entry-form">
+            <label for="player-name">YOUR NAME</label>
+            <input id="player-name" name="name" maxlength="20" autocomplete="nickname" placeholder="What should we call you?" required>
+            <div id="code-field"><label for="room-code">ROOM CODE</label><input id="room-code" name="code" maxlength="5" autocapitalize="characters" autocomplete="off" placeholder="Enter 5-letter code"></div>
+            <button class="button primary entry-button" type="submit"><span id="entry-label">Join the room</span><i data-lucide="arrow-up-right"></i></button>
+            <p class="form-error" id="entry-error" role="alert"></p>
+          </form>
+        </div>
+        <div class="welcome-foot"><span class="avatar-stack"><span>A</span><span>J</span><span>M</span></span><span>Better together. <strong>Best with bids.</strong></span></div>
+      </div>
+      <div class="welcome-visual">
+        <div class="visual-top"><span>LOT NO. 001</span><span>CURIOUS OBJECTS &amp; GOOD COMPANY</span></div>
+        <img src="https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&amp;fit=crop&amp;w=1200&amp;q=85" alt="A collection of interesting objects on shelves">
+        <div class="visual-caption"><div><span>THE FUN IS IN THE FIND</span><strong>What's it worth<br>to you?</strong></div><div class="caption-icon"><i data-lucide="arrow-up-right"></i></div></div>
+        <div class="visual-tag">GOING ONCE <span>✳</span> GOING TWICE <span>✳</span> SOLD</div>
+      </div>
+    </section>
+
+    <section id="game" class="game page-width" hidden>
+      <div class="game-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span> THE AUCTION ROOM</div><h1>Make it <em>yours.</em></h1></div><div class="room-code-wrap"><span>ROOM CODE</span><button id="copy-code" class="code-button" title="Copy room code"><strong id="display-code"></strong><i data-lucide="copy"></i></button><small id="copy-feedback">Share this code with your crew</small></div></div>
+      <div class="game-grid">
+        <div class="game-main">
+          <div class="section-heading"><div><span class="section-number">01 / THE MAIN EVENT</span><h2 id="main-heading">The auction block</h2></div><span class="phase-pill" id="phase-label"><span></span> WAITING ROOM</span></div>
+          <div id="lobby-view" class="lobby-view"><div class="lobby-icon"><i data-lucide="gavel"></i></div><span class="small-label">THE FLOOR IS YOURS</span><h3>Every great find<br>starts here.</h3><p id="lobby-message">Your host is getting the first item ready. Grab your friends and settle in.</p><div class="lobby-line"></div><span class="lobby-bottom">GOOD COMPANY. GREAT BIDS.</span></div>
+          <div id="auction-view" class="auction-view" hidden>
+            <div class="lot-image-wrap"><img id="lot-image" alt=""><div id="image-placeholder" class="image-placeholder"><i data-lucide="package-open"></i></div><div class="lot-badge" id="lot-number">LOT 01</div><div id="timer" class="timer"><i data-lucide="clock-3"></i><span>00:30</span></div></div>
+            <div class="lot-details"><div class="lot-title-row"><div><span class="small-label">UP FOR GRABS</span><h3 id="lot-name"></h3><p id="lot-description"></p></div><span class="asterisk">✳</span></div><div class="bid-area"><div><span class="small-label" id="bid-label">STARTING BID</span><div class="bid-value"><span id="bid-amount">$0.00</span></div><p id="bid-leader">Be the first to make a move.</p><p id="bid-increment"></p></div><div id="bid-controls"><label class="sr-only" for="bid-input">Your bid in dollars</label><div class="bid-input-wrap"><span aria-hidden="true">$</span><input type="number" id="bid-input" min="0.01" step="0.01" inputmode="decimal"></div><button id="bid-button" class="button primary">Place bid <i data-lucide="arrow-up-right"></i></button></div></div><p class="form-error" id="bid-error" role="alert"></p><div id="result-message" class="result-message" hidden></div></div>
+          </div>
+          <p id="ready-note" class="ready-note" hidden>Waiting for the host to start the auction.</p>
+          <div id="ready-host-actions" class="ready-actions" hidden><button id="start-auction-button" class="button dark" type="button">Start auction <i data-lucide="arrow-up-right"></i></button><button id="edit-lot-button" class="button" type="button">Edit item <i data-lucide="pencil"></i></button><p class="form-error" id="start-error" role="alert"></p></div>
+          <div id="live-host-actions" class="live-host-actions" hidden><span>Host controls</span><button id="end-button" class="button dark" type="button">End auction <i data-lucide="gavel"></i></button><p class="form-error" id="end-error" role="alert"></p></div>
+          <section id="host-panel" class="host-panel" hidden><div class="panel-title"><div><span class="section-number">HOST CONTROLS</span><h2 id="host-heading">Put something up for bid</h2></div><i data-lucide="sparkles"></i></div><form id="lot-form"><div class="form-grid"><div class="full"><label for="item-name">ITEM NAME</label><input id="item-name" maxlength="60" placeholder="e.g. The last slice of pizza" required></div><div><label for="starting-bid">STARTING BID <span>($)</span></label><input id="starting-bid" type="number" min="0.01" max="1000000000000" step="0.01" value="50" required></div><div><label for="bid-step">BID INCREMENT <span>($)</span></label><input id="bid-step" type="number" min="0.01" max="1000000000000" step="0.01" value="10" required></div><div class="full"><label for="item-description">DESCRIPTION <span>(OPTIONAL)</span></label><input id="item-description" maxlength="160" placeholder="Give it a little backstory"></div><fieldset class="stock-picker full"><legend>STOCK IMAGES <span>(OPTIONAL)</span></legend><div id="stock-images" class="stock-images"></div></fieldset><div class="full"><label for="item-upload">UPLOAD IMAGE <span>(JPEG, PNG, GIF, WEBP; MAX 5 MB)</span></label><input id="item-upload" class="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><p id="upload-status" class="upload-status" role="status" aria-live="polite"></p></div><div class="full"><label for="item-image">IMAGE URL <span>(OPTIONAL)</span></label><input id="item-image" type="text" inputmode="url" maxlength="1000" placeholder="https://..."><img id="image-preview" class="image-preview" alt="Selected item image" hidden></div></div><label class="auto-end-option"><input id="auto-end" type="checkbox" checked><span>Automatically end after 30 seconds without a bid</span></label><div class="host-actions"><span>The host can end the auction at any time</span><button class="button dark" id="prepare-button" type="submit">Prepare item <i data-lucide="arrow-up-right"></i></button></div><p class="form-error" id="host-error" role="alert"></p></form></section>
+        </div>
+        <aside class="game-sidebar"><div class="players-panel"><div class="sidebar-title"><div><span class="section-number">02 / THE PEOPLE</span><h2>In the room <span id="player-count">0</span></h2></div><i data-lucide="users-round"></i></div><div id="players-list" class="players-list"></div></div><div class="history-panel"><div class="sidebar-title"><div><span class="section-number">03 / THE RECAP</span><h2>Past lots</h2></div><i data-lucide="history"></i></div><div id="history-list" class="history-list"><p class="empty-history">The good stuff is still to come.</p></div></div><div class="sidebar-note"><span>THE ONLY RULE?</span><strong>Have a little fun with it.</strong><i data-lucide="smile"></i></div><button id="leave-button" class="leave-button"><i data-lucide="log-out"></i> Leave room</button></aside>
+      </div>
+    </section>
+  </main>
+  <dialog id="result-dialog" class="result-dialog" aria-labelledby="result-title" aria-describedby="result-detail">
+    <div class="result-dialog-icon" aria-hidden="true"><i data-lucide="gavel"></i></div>
+    <span class="section-number">AUCTION ENDED</span>
+    <h2 id="result-title"></h2>
+    <p id="result-detail"></p>
+    <form method="dialog"><button class="button dark" type="submit">Continue <i data-lucide="arrow-right"></i></button></form>
+  </dialog>
+  <dialog id="leave-dialog" class="result-dialog" aria-labelledby="leave-title" aria-describedby="leave-detail">
+    <div class="result-dialog-icon" aria-hidden="true"><i data-lucide="log-out"></i></div>
+    <h2 id="leave-title">Leave this lobby?</h2>
+    <p id="leave-detail"></p>
+    <div class="leave-dialog-actions"><button id="cancel-leave" class="button" type="button">Stay</button><button id="confirm-leave" class="button dark" type="button">Leave lobby</button></div>
+    <p class="form-error" id="leave-error" role="alert"></p>
+  </dialog>
+  <footer class="footer page-width"><span>© GOING ONCE</span><span>MADE FOR THE MOMENTS IN BETWEEN <span class="footer-star">✳</span></span><span>EST. FOR A GOOD TIME</span></footer>
+</body>
+</html>
