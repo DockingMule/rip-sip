@@ -27,9 +27,13 @@ test('players can join, bid, settle a round, and transfer hosting', async (conte
   });
   await Promise.all([host, guest].map((socket) => new Promise((resolve) => socket.on('connect', resolve))));
 
-  const created = await emit(host, 'room:create', { name: 'Host' });
+  assert.match((await emit(host, 'room:create', { name: 'Host', venmoLink: 'https://venmo.com.evil.example/u/host' })).error, /valid.*venmo/i);
+  assert.match((await emit(host, 'room:create', { name: 'Host', venmoLink: 'javascript:alert(1)' })).error, /valid.*venmo/i);
+  assert.match((await emit(host, 'room:create', { name: 'Host', venmoLink: 'http://venmo.com/u/host' })).error, /valid.*venmo/i);
+  const created = await emit(host, 'room:create', { name: 'Host', venmoLink: 'https://venmo.com/u/host' });
   assert.equal(created.code.length, 5);
   const room = rooms.get(created.code);
+  assert.equal(room.venmoLink, 'https://venmo.com/u/host');
   assert.equal(room.phase, 'lobby');
   assert.equal('balance' in room.players.get(created.playerId), false);
   assert.equal(room.endsAt, null);
@@ -37,8 +41,10 @@ test('players can join, bid, settle a round, and transfer hosting', async (conte
   assert.equal(room.phase, 'ready');
   assert.equal(room.endsAt, null);
   assert.match((await emit(guest, 'room:join', { name: 'Guest', code: 'WRONG' })).error, /not found/i);
+  const guestUpdate = new Promise((resolve) => guest.once('room:update', resolve));
   let joined = await emit(guest, 'room:join', { name: 'Guest', code: created.code.toLowerCase() });
   assert.ok(joined.playerId);
+  assert.equal((await guestUpdate).venmoLink, 'https://venmo.com/u/host');
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=', 'base64');
   assert.match((await emit(guest, 'image:upload', { data: png })).error, /host/i);
   assert.match((await emit(host, 'image:upload', { data: Buffer.from('not an image') })).error, /JPEG/i);

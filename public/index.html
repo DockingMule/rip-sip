@@ -40,6 +40,7 @@
     .result-dialog h2 { font: 600 32px/1.1 var(--display); margin: 10px 0 14px; overflow-wrap: anywhere; }
     .result-dialog p { line-height: 1.6; color: #70796d; overflow-wrap: anywhere; margin: 0 0 25px; }
     .result-dialog .button { width: 100%; }
+    .result-dialog .venmo-link { margin: 0 0 10px; text-decoration: none; justify-content: space-between; }
     .leave-dialog-actions { display: flex; gap: 10px; }
     .leave-dialog-actions .button { flex: 1; justify-content: center; }
     .result-dialog .form-error { color: #b34f35; margin: 12px 0 0; }
@@ -72,6 +73,7 @@
             <label for="player-name">YOUR NAME</label>
             <input id="player-name" name="name" maxlength="20" autocomplete="nickname" placeholder="What should we call you?" required>
             <div id="code-field"><label for="room-code">ROOM CODE</label><input id="room-code" name="code" maxlength="5" autocapitalize="characters" autocomplete="off" placeholder="Enter 5-letter code"></div>
+            <div id="venmo-field" hidden><label for="venmo-link">VENMO LINK <span>(OPTIONAL)</span></label><input id="venmo-link" name="venmoLink" type="url" maxlength="2048" placeholder="https://venmo.com/u/yourname" disabled></div>
             <button class="button primary entry-button" type="submit"><span id="entry-label">Join the room</span><i data-lucide="arrow-up-right"></i></button>
             <p class="form-error" id="entry-error" role="alert"></p>
           </form>
@@ -110,6 +112,7 @@
     <span class="section-number">AUCTION ENDED</span>
     <h2 id="result-title"></h2>
     <p id="result-detail"></p>
+    <a id="result-venmo" class="button primary venmo-link" target="_blank" rel="noopener noreferrer" hidden>Pay with Venmo <i data-lucide="external-link"></i></a>
     <form method="dialog"><button class="button dark" type="submit">Continue <i data-lucide="arrow-right"></i></button></form>
   </dialog>
   <dialog id="leave-dialog" class="result-dialog" aria-labelledby="leave-title" aria-describedby="leave-detail">

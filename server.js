@@ -34,6 +34,7 @@ function publicRoom(room) {
   return {
     code: room.code,
     hostId: room.hostId,
+    venmoLink: room.venmoLink,
     players: [...room.players.values()].map(({ id, name, connected, wins }) => ({ id, name, connected, wins })),
     phase: room.phase,
     lot: room.lot,
@@ -74,6 +75,20 @@ function validName(value) {
   return typeof value === 'string' ? value.trim().slice(0, 20) : '';
 }
 
+function validVenmoLink(value) {
+  if (value === undefined || value === '') return '';
+  if (typeof value !== 'string' || value.length > 2048) return null;
+  value = value.trim();
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || !['venmo.com', 'www.venmo.com'].includes(url.hostname) || url.username || url.password || url.port) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
 function imageType(data) {
   if (!Buffer.isBuffer(data)) return null;
   if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
@@ -109,12 +124,14 @@ io.on('connection', (socket) => {
     publish(room);
   }
 
-  socket.on('room:create', ({ name } = {}, callback) => {
+  socket.on('room:create', ({ name, venmoLink } = {}, callback) => {
     name = validName(name);
     if (!name) return respond(callback, 'Enter your name to create a room.');
     if (socket.data.code) return respond(callback, 'Leave your current room first.');
+    venmoLink = validVenmoLink(venmoLink);
+    if (venmoLink === null) return respond(callback, 'Enter a valid https://venmo.com link.');
     const id = crypto.randomUUID();
-    const room = { code: makeCode(), hostId: id, players: new Map(), images: new Map(), phase: 'lobby', lot: null, bid: 0, leaderId: null, leaderName: null, endsAt: null, history: [], round: 0 };
+    const room = { code: makeCode(), hostId: id, venmoLink, players: new Map(), images: new Map(), phase: 'lobby', lot: null, bid: 0, leaderId: null, leaderName: null, endsAt: null, history: [], round: 0 };
     const player = { id, name, connected: true, wins: 0 };
     room.players.set(id, player);
     rooms.set(room.code, room);

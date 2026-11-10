@@ -90,6 +90,8 @@ document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click',
   });
   $('#code-field').hidden = mode === 'create';
   $('#room-code').required = mode === 'join';
+  $('#venmo-field').hidden = mode !== 'create';
+  $('#venmo-link').disabled = mode !== 'create';
   $('#entry-label').textContent = mode === 'join' ? 'Join the room' : 'Create a room';
   errorAt('#entry-error');
 }));
@@ -101,6 +103,7 @@ entryForm.addEventListener('submit', (event) => {
   const button = entryForm.querySelector('button[type="submit"]');
   button.disabled = true;
   const payload = { name: $('#player-name').value.trim(), code: $('#room-code').value.trim() };
+  if (mode === 'create') payload.venmoLink = $('#venmo-link').value.trim();
   socket.timeout(5000).emit(mode === 'create' ? 'room:create' : 'room:join', payload, (error, response) => {
     button.disabled = false;
     if (error) return errorAt('#entry-error', 'Could not reach the server. Please try again.');
@@ -349,6 +352,10 @@ function showResult() {
   const result = room.history[0];
   if (!result) return;
   if (dialog.open) dialog.close();
+  const venmo = $('#result-venmo');
+  venmo.hidden = !result.winner || room.leaderId !== identity.playerId || !room.venmoLink;
+  if (venmo.hidden) venmo.removeAttribute('href');
+  else venmo.href = room.venmoLink;
   if (!result.winner) {
     $('#result-title').textContent = 'No bids this time';
     $('#result-detail').textContent = `${result.lot.name} ended without a winner.`;
