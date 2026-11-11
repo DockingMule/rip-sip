@@ -1,0 +1,10 @@
+.site-notice {
+  padding: 12px 24px;
+  background: #e8dfb9;
+  color: #3e402b;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
