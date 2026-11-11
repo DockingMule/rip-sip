@@ -3,15 +3,20 @@ const $ = (selector) => document.querySelector(selector);
 const welcome = $('#welcome');
 const game = $('#game');
 const entryForm = $('#entry-form');
+const authForm = $('#auth-form');
+const hostCreateForm = $('#host-create-form');
 const lotForm = $('#lot-form');
 const savedKey = 'going-once-player';
-let mode = 'join';
+let mode = new URLSearchParams(location.search).get('host') === '1' ? 'create' : 'join';
+let authMode = 'login';
+let authUser = null;
 let identity = null;
 let room = null;
 let timerInterval;
 let editingLot = false;
 let lastResult = null;
 let lastImageDefault = null;
+const playerPictures = new Map();
 let uploadVersion = 0;
 let uploadingImage = false;
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -44,7 +49,7 @@ function errorAt(selector, message = '') {
 }
 
 function saveIdentity(data) {
-  identity = { code: data.code, playerId: data.playerId };
+  identity = { code: data.code, playerId: data.playerId, rejoinToken: data.rejoinToken };
   localStorage.setItem(savedKey, JSON.stringify(identity));
   render();
 }
@@ -52,6 +57,7 @@ function saveIdentity(data) {
 function resetRoom() {
   identity = null;
   room = null;
+  playerPictures.clear();
   editingLot = false;
   lastResult = null;
   lastImageDefault = null;
@@ -74,18 +80,70 @@ function updateConnection(connected) {
   $('#connection-label').textContent = connected ? 'Online' : 'Reconnecting';
 }
 
+function updateEntryMode() {
+  const hostMode = mode === 'create';
+  entryForm.hidden = hostMode;
+  $('#host-auth').hidden = !hostMode || !!authUser;
+  $('#host-account-panel').hidden = !hostMode || !authUser;
+  if (authUser) $('#host-account-label').textContent = `Signed in as ${authUser.email}`;
+}
+
+async function updateHostLink() {
+  const link = $('#host-profile-link');
+  const avatar = $('#host-profile-avatar');
+  const user = authUser;
+  link.hidden = !user;
+  avatar.replaceChildren();
+  if (!user) return;
+  try {
+    const response = await fetch('/api/host/profile');
+    if (!response.ok) throw new Error('Could not load host profile.');
+    const profile = await response.json();
+    if (authUser !== user) return;
+    const fallback = profile.displayName.trim().slice(0, 1).toUpperCase() || user.email.slice(0, 1).toUpperCase();
+    if (!profile.hasAvatar) {
+      avatar.textContent = fallback;
+      return;
+    }
+    const image = document.createElement('img');
+    image.alt = '';
+    image.src = '/api/host/profile/avatar';
+    image.onerror = () => { avatar.textContent = fallback; };
+    avatar.append(image);
+  } catch {
+    if (authUser === user) avatar.textContent = user.email.slice(0, 1).toUpperCase();
+  }
+}
+
+fetch('/api/auth/session')
+  .then((response) => response.ok ? response.json() : Promise.reject(new Error('Could not check the sign-in status.')))
+  .then(({ user }) => {
+    authUser = user;
+    updateEntryMode();
+    updateHostLink();
+  })
+  .catch(() => {
+    authUser = null;
+    updateEntryMode();
+    updateHostLink();
+  });
+
 socket.on('connect', () => {
   updateConnection(true);
   if (identity) {
     socket.emit('room:join', identity, (response) => {
       if (response.error) {
         resetRoom();
-        errorAt('#entry-error', 'Your room is no longer available. Start or join another game.');
+        errorAt('#entry-error', response.error);
       } else saveIdentity(response);
     });
   }
 });
 socket.on('disconnect', () => updateConnection(false));
+socket.on('room:closed', () => {
+  resetRoom();
+  errorAt('#entry-error', 'The host closed the room because no invited host was available to take over.');
+});
 socket.on('room:update', (data) => {
   const previous = room;
   room = data;
@@ -99,13 +157,12 @@ document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click',
     item.classList.toggle('active', item === tab);
     item.setAttribute('aria-selected', String(item === tab));
   });
-  $('#code-field').hidden = mode === 'create';
-  $('#room-code').required = mode === 'join';
-  $('#venmo-field').hidden = mode !== 'create';
-  $('#venmo-link').disabled = mode !== 'create';
-  $('#entry-label').textContent = mode === 'join' ? 'Join the room' : 'Create a room';
+  updateEntryMode();
   errorAt('#entry-error');
+  errorAt('#auth-error');
+  errorAt('#host-entry-error');
 }));
+if (mode === 'create') document.querySelector('.tab[data-mode="create"]').click();
 
 entryForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -114,11 +171,86 @@ entryForm.addEventListener('submit', (event) => {
   const button = entryForm.querySelector('button[type="submit"]');
   button.disabled = true;
   const payload = { name: $('#player-name').value.trim(), code: $('#room-code').value.trim() };
-  if (mode === 'create') payload.venmoLink = $('#venmo-link').value.trim();
-  socket.timeout(5000).emit(mode === 'create' ? 'room:create' : 'room:join', payload, (error, response) => {
+  socket.timeout(5000).emit('room:join', payload, (error, response) => {
     button.disabled = false;
     if (error) return errorAt('#entry-error', 'Could not reach the server. Please try again.');
     if (response.error) return errorAt('#entry-error', response.error);
+    saveIdentity(response);
+  });
+});
+
+function setAuthMode(nextMode) {
+  authMode = nextMode;
+  const registering = authMode === 'register';
+  $('#auth-login-mode').classList.toggle('active', !registering);
+  $('#auth-register-mode').classList.toggle('active', registering);
+  $('#auth-password').autocomplete = registering ? 'new-password' : 'current-password';
+  $('#auth-password').minLength = registering ? 12 : 0;
+  $('#auth-invite-wrap').hidden = !registering;
+  $('#auth-invite-code').required = registering;
+  if (!registering) $('#auth-invite-code').value = '';
+  $('#auth-submit').firstChild.textContent = registering ? 'Create invited account ' : 'Sign in ';
+  errorAt('#auth-error');
+}
+
+$('#auth-login-mode').addEventListener('click', () => setAuthMode('login'));
+$('#auth-register-mode').addEventListener('click', () => setAuthMode('register'));
+
+authForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = $('#auth-submit');
+  button.disabled = true;
+  errorAt('#auth-error');
+  try {
+    const response = await fetch(`/api/auth/${authMode}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: $('#auth-email').value.trim(),
+        password: $('#auth-password').value,
+        ...(authMode === 'register' ? { invitationCode: $('#auth-invite-code').value.trim() } : {})
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) return errorAt('#auth-error', result.error || 'Could not sign in. Please try again.');
+    authUser = result.user;
+    authForm.reset();
+    updateEntryMode();
+    updateHostLink();
+    socket.disconnect();
+    socket.connect();
+  } catch {
+    errorAt('#auth-error', 'Could not reach the server. Please try again.');
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$('#auth-logout').addEventListener('click', async () => {
+  errorAt('#auth-error');
+  try {
+    const response = await fetch('/api/auth/logout', { method: 'POST' });
+    if (!response.ok) return errorAt('#auth-error', 'Could not sign out. Please try again.');
+    authUser = null;
+    updateEntryMode();
+    updateHostLink();
+    socket.disconnect();
+    socket.connect();
+  } catch {
+    errorAt('#auth-error', 'Could not reach the server. Please try again.');
+  }
+});
+
+hostCreateForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!socket.connected) return errorAt('#host-entry-error', 'Connecting to the server. Please try again.');
+  errorAt('#host-entry-error');
+  const button = hostCreateForm.querySelector('button[type="submit"]');
+  button.disabled = true;
+  socket.timeout(5000).emit('room:create', { auctionName: $('#auction-name').value.trim() }, (error, response) => {
+    button.disabled = false;
+    if (error) return errorAt('#host-entry-error', 'Could not reach the server. Please try again.');
+    if (response.error) return errorAt('#host-entry-error', response.error);
     saveIdentity(response);
   });
 });
@@ -201,7 +333,7 @@ function confirmLeave() {
   errorAt('#leave-error');
   const isHost = room?.hostId === identity?.playerId;
   $('#leave-detail').textContent = isHost && room.players.length > 1
-    ? 'Another player will become the host when you leave.'
+    ? 'An invited host can take over; otherwise, leaving will close the room.'
     : isHost ? 'The lobby will close when you leave.' : 'You will leave this lobby.';
   if (!$('#leave-dialog').open) $('#leave-dialog').showModal();
 }
@@ -369,10 +501,31 @@ $('#item-upload').addEventListener('change', async (event) => {
 function renderPlayers() {
   const list = $('#players-list');
   list.replaceChildren();
+  const playerIds = new Set(room.players.map((player) => player.id));
+  for (const id of playerPictures.keys()) {
+    if (!playerIds.has(id)) playerPictures.delete(id);
+  }
   $('#player-count').textContent = room.players.length;
   room.players.forEach((player) => {
     const row = element('div', 'player-row');
     const avatar = element('div', 'player-avatar', player.name.slice(0, 1).toUpperCase());
+    if (player.avatarUrl) {
+      let picture = playerPictures.get(player.id);
+      if (!picture || picture.url !== player.avatarUrl) {
+        const image = element('img');
+        image.alt = '';
+        picture = { url: player.avatarUrl, image, failed: false };
+        image.onerror = () => {
+          picture.failed = true;
+          image.remove();
+        };
+        image.src = player.avatarUrl;
+        playerPictures.set(player.id, picture);
+      }
+      if (!picture.failed) avatar.append(picture.image);
+    } else {
+      playerPictures.delete(player.id);
+    }
     const info = element('div', 'player-info');
     info.append(element('div', 'player-name', player.name + (player.id === identity.playerId ? ' (you)' : '')));
     const roles = [];
@@ -582,6 +735,7 @@ function render() {
   welcome.hidden = true;
   game.hidden = false;
   $('#display-code').textContent = room.code;
+  $('#display-auction-name').textContent = room.auctionName;
   $('#host-panel').hidden = !host || room.phase === 'live' || (room.phase === 'ready' && !editingLot);
   $('#ready-host-actions').hidden = !host || room.phase !== 'ready' || editingLot;
   $('#ready-note').hidden = room.phase !== 'ready' || host;

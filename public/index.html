@@ -9,8 +9,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/host.css">
   <style>
     .welcome h1 { font-size: 72px; }
+    .game-heading { gap: 24px; }
+    .game-title { flex: 1; min-width: 0; }
+    .game-title h1 { overflow-wrap: anywhere; }
+    .room-code-wrap { flex: none; }
     .lot-title-row > div { min-width: 0; }
     .lot-title-row h3, .lot-title-row p { overflow-wrap: anywhere; }
     .auto-end-option { display: flex; align-items: flex-start; gap: 10px; margin: 20px 0 0; color: var(--ink); font-size: 12px; line-height: 1.5; letter-spacing: 0; }
@@ -50,6 +56,12 @@
     .leave-dialog-actions { display: flex; gap: 10px; }
     .leave-dialog-actions .button { flex: 1; justify-content: center; }
     .result-dialog .form-error { color: #b34f35; margin: 12px 0 0; }
+    .host-auth input, #host-create-form input { margin-bottom: 20px; }
+    .host-auth-mode { display: flex; gap: 12px; margin: 0 0 18px; }
+    .host-auth-mode button, .host-account-row button { border: 0; background: none; padding: 0; color: #69775f; font-size: 12px; font-weight: 700; text-decoration: underline; }
+    .host-auth-mode button.active { color: var(--ink); text-decoration-thickness: 2px; }
+    .host-auth-note, .host-account-row { color: #858b7f; font-size: 12px; line-height: 1.5; margin: 0 0 18px; }
+    .host-account-row { display: flex; justify-content: space-between; gap: 12px; }
     .timer { transform-origin: top right; transition: transform .25s ease, background-color .25s ease, color .25s ease; }
     .timer.warning { transform: scale(1.5); color: #b4401f; }
     .timer.critical { transform: scale(2.4); background: #c93a1f; color: #fff; }
@@ -77,7 +89,13 @@
     .kick-leg { transform-origin: 100px 112px; transform: rotate(-25deg); }
     .dust, .pebble { transform-box: fill-box; transform-origin: center; }
     .dust { fill: #b4b8ad; opacity: 0; }
-    @media (max-width: 650px) { .timer.warning { transform: scale(1.35); } .timer.critical { transform: scale(1.9); } }
+    @media (max-width: 650px) {
+      .game-heading { align-items: flex-start; flex-direction: column; gap: 18px; }
+      .room-code-wrap { text-align: left; }
+      .room-code-wrap small { max-width: none; }
+      .timer.warning { transform: scale(1.35); }
+      .timer.critical { transform: scale(1.9); }
+    }
     @media (prefers-reduced-motion: no-preference) {
       .timer.critical { animation: timer-flash .7s ease-in-out infinite; }
       .timer.boost::after { animation: timer-ring .9s ease-out; }
@@ -113,12 +131,14 @@
   </style>
   <script src="/socket.io/socket.io.js" defer></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="/site.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
+  <div id="site-notice" class="site-notice" role="status" aria-live="polite" hidden></div>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Going Once home"><span class="brand-mark"><i data-lucide="gavel"></i></span><span>going<span class="brand-dot">.</span>once</span></a>
-    <div class="topbar-right"><span class="connection"><span class="status-dot"></span><span id="connection-label">Connecting</span></span><span class="topbar-divider"></span><span class="edition">THE PARTY AUCTION GAME</span></div>
+    <div class="topbar-right"><span class="connection"><span class="status-dot"></span><span id="connection-label">Connecting</span></span><span class="topbar-divider"></span><span class="edition">THE PARTY AUCTION GAME</span><a id="host-profile-link" class="host-profile-link" href="/host.html" aria-label="Host preferences" title="Host preferences" hidden><span id="host-profile-avatar" class="host-profile-avatar"></span></a></div>
   </header>
 
   <main>
@@ -135,11 +155,40 @@
           <form id="entry-form">
             <label for="player-name">YOUR NAME</label>
             <input id="player-name" name="name" maxlength="20" autocomplete="nickname" placeholder="What should we call you?" required>
-            <div id="code-field"><label for="room-code">ROOM CODE</label><input id="room-code" name="code" maxlength="5" autocapitalize="characters" autocomplete="off" placeholder="Enter 5-letter code"></div>
-            <div id="venmo-field" hidden><label for="venmo-link">VENMO LINK <span>(OPTIONAL)</span></label><input id="venmo-link" name="venmoLink" type="url" maxlength="2048" placeholder="https://venmo.com/u/yourname" disabled></div>
-            <button class="button primary entry-button" type="submit"><span id="entry-label">Join the room</span><i data-lucide="arrow-up-right"></i></button>
+            <label for="room-code">ROOM CODE</label>
+            <input id="room-code" name="code" maxlength="5" autocapitalize="characters" autocomplete="off" placeholder="Enter 5-letter code" required>
+            <button class="button primary entry-button" type="submit">Join the room <i data-lucide="arrow-up-right"></i></button>
             <p class="form-error" id="entry-error" role="alert"></p>
           </form>
+          <section id="host-auth" class="host-auth" hidden>
+            <div class="host-auth-mode" aria-label="Host account options">
+              <button id="auth-login-mode" class="active" type="button">Sign in</button>
+              <button id="auth-register-mode" type="button">Create invited account</button>
+            </div>
+            <p id="auth-note" class="host-auth-note">Host accounts are available by invitation only. To request access to the closed beta, email <a href="mailto:austinalloway@ravenpi.dev">austinalloway@ravenpi.dev</a>. Guests can join with a room code.</p>
+            <form id="auth-form">
+              <label for="auth-email">EMAIL</label>
+              <input id="auth-email" type="email" autocomplete="email" maxlength="254" required>
+              <label for="auth-password">PASSWORD</label>
+              <input id="auth-password" type="password" autocomplete="current-password" maxlength="128" required>
+              <div id="auth-invite-wrap" hidden>
+                <label for="auth-invite-code">INVITATION CODE</label>
+                <input id="auth-invite-code" type="password" autocomplete="off" maxlength="64">
+              </div>
+              <button id="auth-submit" class="button primary entry-button" type="submit">Sign in <i data-lucide="arrow-up-right"></i></button>
+              <p class="form-error" id="auth-error" role="alert"></p>
+            </form>
+          </section>
+          <section id="host-account-panel" hidden>
+            <div class="host-account-row"><span id="host-account-label"></span><button id="auth-logout" type="button">Sign out</button></div>
+            <p class="host-profile-hint">Your saved display name and Venmo are used for every room. <a href="/host.html">Manage host preferences</a></p>
+            <form id="host-create-form">
+              <label for="auction-name">AUCTION NAME</label>
+              <input id="auction-name" maxlength="60" placeholder="e.g. Summer garage sale" required>
+              <button class="button primary entry-button" type="submit">Create a room <i data-lucide="arrow-up-right"></i></button>
+              <p class="form-error" id="host-entry-error" role="alert"></p>
+            </form>
+          </section>
         </div>
         <div class="welcome-foot"><span class="avatar-stack"><span>A</span><span>J</span><span>M</span></span><span>Better together. <strong>Best with bids.</strong></span></div>
       </div>
@@ -152,7 +201,7 @@
     </section>
 
     <section id="game" class="game page-width" hidden>
-      <div class="game-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span> THE AUCTION ROOM</div><h1>Make it <em>yours.</em></h1></div><div class="room-code-wrap"><span>ROOM CODE</span><button id="copy-code" class="code-button" title="Copy room code"><strong id="display-code"></strong><i data-lucide="copy"></i></button><small id="copy-feedback">Share this code with your crew</small></div></div>
+      <div class="game-heading"><div class="game-title"><div class="eyebrow"><span class="eyebrow-dot"></span> THE AUCTION ROOM</div><h1 id="display-auction-name"></h1></div><div class="room-code-wrap"><span>ROOM CODE</span><button id="copy-code" class="code-button" title="Copy room code"><strong id="display-code"></strong><i data-lucide="copy"></i></button><small id="copy-feedback">Share this code with your crew</small></div></div>
       <div class="game-grid">
         <div class="game-main">
           <div class="section-heading"><div><span class="section-number">01 / THE MAIN EVENT</span><h2 id="main-heading">The auction block</h2></div><span class="phase-pill" id="phase-label"><span></span> WAITING ROOM</span></div>
@@ -164,7 +213,7 @@
           <p id="ready-note" class="ready-note" hidden>Waiting for the host to start the auction.</p>
           <div id="ready-host-actions" class="ready-actions" hidden><button id="start-auction-button" class="button dark" type="button">Start auction <i data-lucide="arrow-up-right"></i></button><button id="edit-lot-button" class="button" type="button">Edit item <i data-lucide="pencil"></i></button><p class="form-error" id="start-error" role="alert"></p></div>
           <div id="live-host-actions" class="live-host-actions" hidden><span>Host controls</span><button id="end-button" class="button dark" type="button">End auction <i data-lucide="gavel"></i></button><p class="form-error" id="end-error" role="alert"></p></div>
-          <section id="host-panel" class="host-panel" hidden><div class="panel-title"><div><span class="section-number">HOST CONTROLS</span><h2 id="host-heading">Put something up for bid</h2></div><i data-lucide="sparkles"></i></div><form id="lot-form"><div class="form-grid"><div class="full"><label for="item-name">ITEM NAME</label><input id="item-name" maxlength="60" placeholder="e.g. The last slice of pizza" required></div><div><label for="starting-bid">STARTING BID <span>($)</span></label><input id="starting-bid" type="number" min="0.01" max="1000000000000" step="0.01" value="50" required></div><div><label for="bid-step">BID INCREMENT <span>($)</span></label><input id="bid-step" type="number" min="0.01" max="1000000000000" step="0.01" value="10" required></div><div class="full"><label for="item-description">DESCRIPTION <span>(OPTIONAL)</span></label><input id="item-description" maxlength="160" placeholder="Give it a little backstory"></div><div class="full stock-dropdown"><label for="stock-button">STOCK IMAGE <span>(OPTIONAL)</span></label><button type="button" id="stock-button" class="stock-button" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="stock-list"><span id="stock-current" class="stock-thumb none"></span><span id="stock-current-name">Choose a stock image</span></button><ul id="stock-list" class="stock-list" role="listbox" aria-label="Stock images" hidden></ul></div><div class="full"><label for="item-upload">UPLOAD IMAGE <span>(JPEG, PNG, GIF, WEBP; MAX 5 MB)</span></label><input id="item-upload" class="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><p id="upload-status" class="upload-status" role="status" aria-live="polite"></p></div><div class="full"><label for="item-image">IMAGE URL <span>(OPTIONAL)</span></label><input id="item-image" type="text" inputmode="url" maxlength="1000" placeholder="https://..."><img id="image-preview" class="image-preview" alt="Selected item image" hidden></div></div><label class="auto-end-option"><input id="auto-end" type="checkbox" checked><span>Automatically end the auction when time runs out</span></label><div id="auto-end-times" class="auto-end-times"><div><label for="start-seconds">START TIME</label><select id="start-seconds"><option value="30" selected>30 seconds</option><option value="20">20 seconds</option><option value="15">15 seconds</option></select></div><div><label for="add-seconds">TIME ADDED PER BID</label><select id="add-seconds"><option value="10" selected>10 seconds</option><option value="7">7 seconds</option><option value="5">5 seconds</option></select></div></div><div class="host-actions"><span>The host can end the auction at any time</span><button class="button dark" id="prepare-button" type="submit">Prepare item <i data-lucide="arrow-up-right"></i></button></div><p class="form-error" id="host-error" role="alert"></p></form></section>
+          <section id="host-panel" class="host-panel" hidden><div class="panel-title"><div><span class="section-number">HOST CONTROLS</span><h2 id="host-heading">Put something up for bid</h2></div><i data-lucide="sparkles"></i></div><form id="lot-form"><div class="form-grid"><div class="full"><label for="item-name">ITEM NAME</label><input id="item-name" maxlength="60" placeholder="e.g. The last slice of pizza" required></div><div><label for="starting-bid">STARTING BID <span>($)</span></label><input id="starting-bid" type="number" min="0.01" max="1000000000000" step="0.01" value="1" required></div><div><label for="bid-step">BID INCREMENT <span>($)</span></label><input id="bid-step" type="number" min="0.01" max="1000000000000" step="0.01" value="1" required></div><div class="full"><label for="item-description">DESCRIPTION <span>(OPTIONAL)</span></label><input id="item-description" maxlength="160" placeholder="Give it a little backstory"></div><div class="full stock-dropdown"><label for="stock-button">STOCK IMAGE <span>(OPTIONAL)</span></label><button type="button" id="stock-button" class="stock-button" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="stock-list"><span id="stock-current" class="stock-thumb none"></span><span id="stock-current-name">Choose a stock image</span></button><ul id="stock-list" class="stock-list" role="listbox" aria-label="Stock images" hidden></ul></div><div class="full"><label for="item-upload">UPLOAD IMAGE <span>(JPEG, PNG, GIF, WEBP; MAX 5 MB)</span></label><input id="item-upload" class="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><p id="upload-status" class="upload-status" role="status" aria-live="polite"></p></div><div class="full"><label for="item-image">IMAGE URL <span>(OPTIONAL)</span></label><input id="item-image" type="text" inputmode="url" maxlength="1000" placeholder="https://..."><img id="image-preview" class="image-preview" alt="Selected item image" hidden></div></div><label class="auto-end-option"><input id="auto-end" type="checkbox" checked><span>Automatically end the auction when time runs out</span></label><div id="auto-end-times" class="auto-end-times"><div><label for="start-seconds">START TIME</label><select id="start-seconds"><option value="30" selected>30 seconds</option><option value="20">20 seconds</option><option value="15">15 seconds</option></select></div><div><label for="add-seconds">TIME ADDED PER BID</label><select id="add-seconds"><option value="10" selected>10 seconds</option><option value="7">7 seconds</option><option value="5">5 seconds</option></select></div></div><div class="host-actions"><span>The host can end the auction at any time</span><button class="button dark" id="prepare-button" type="submit">Prepare item <i data-lucide="arrow-up-right"></i></button></div><p class="form-error" id="host-error" role="alert"></p></form></section>
         </div>
         <aside class="game-sidebar"><div class="players-panel"><div class="sidebar-title"><div><span class="section-number">02 / THE PEOPLE</span><h2>In the room <span id="player-count">0</span></h2></div><i data-lucide="users-round"></i></div><div id="players-list" class="players-list"></div></div><div class="history-panel"><div class="sidebar-title"><div><span class="section-number">03 / THE RECAP</span><h2>Past lots</h2></div><i data-lucide="history"></i></div><div id="history-list" class="history-list"><p class="empty-history">The good stuff is still to come.</p></div><button id="download-csv" class="leave-button" type="button" hidden><i data-lucide="download"></i> Download CSV</button></div><div class="sidebar-note"><span>THE ONLY RULE?</span><strong>Have a little fun with it.</strong><i data-lucide="smile"></i></div><button id="leave-button" class="leave-button"><i data-lucide="log-out"></i> Leave room</button></aside>
       </div>

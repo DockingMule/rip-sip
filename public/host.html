@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5f0">
+  <title>Host preferences | Going Once</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/host.css">
+  <style>
+    .auction-download { background: #dfe1da; color: #4b5148; }
+    .auction-download:hover { background: #d2d5cb; }
+    .auction-history-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .auction-delete { background: #e8dfda; color: #914e3e; }
+    .auction-delete:hover { background: #ded0c9; }
+    .admin-panel { margin-top: 28px; padding: 24px; background: #edeee7; }
+    .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 24px; }
+    .admin-panel h2 { font: 600 22px var(--display); margin: 7px 0 24px; }
+    .admin-panel h3 { font: 600 16px var(--display); margin: 0 0 15px; }
+    .admin-panel textarea { width: 100%; min-height: 100px; resize: vertical; font: inherit; padding: 12px; border: 1px solid #dddfd7; }
+    .admin-panel .admin-option { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0; font-size: 12px; line-height: 1.5; letter-spacing: 0; }
+    .admin-panel .admin-option input { width: 16px; height: 16px; flex: none; margin: 1px 0 0; }
+    .admin-panel .button { margin-top: 10px; min-height: 40px; }
+    .admin-users { list-style: none; padding: 0; }
+    .admin-users li { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #d5d9cf; padding: 10px 0; overflow-wrap: anywhere; }
+    .admin-users small { display: block; color: #737b6e; margin-top: 4px; }
+    .admin-users button { flex: none; }
+    .admin-stats { line-height: 1.8; color: #5f6b5b; }
+  </style>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="/site.js" defer></script>
+  <script src="/host.js" defer></script>
+  <script src="/admin.js" defer></script>
+</head>
+<body>
+  <div id="site-notice" class="site-notice" role="status" aria-live="polite" hidden></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Going Once home"><span class="brand-mark"><i data-lucide="gavel"></i></span><span>going<span class="brand-dot">.</span>once</span></a>
+    <div class="topbar-right">
+      <a id="host-profile-link" class="host-profile-link active" href="/host.html" aria-label="Host preferences" title="Host preferences"><span id="host-profile-avatar" class="host-profile-avatar">?</span></a>
+      <a class="host-back-link" href="/">Back to the auction</a>
+    </div>
+  </header>
+  <main class="host-page page-width">
+    <div class="host-page-heading">
+      <div>
+        <div class="eyebrow"><span class="eyebrow-dot"></span> HOST ACCOUNT</div>
+        <h1>Your <em>preferences.</em></h1>
+        <p>Set the details your guests see and keep a record of every lot you host.</p>
+      </div>
+      <button id="host-signout" class="host-signout" type="button">Sign out</button>
+    </div>
+    <p id="page-error" class="form-error" role="alert"></p>
+    <div class="host-page-grid">
+      <section class="host-settings-panel">
+        <div class="host-panel-heading">
+          <div><span class="section-number">01 / YOUR PROFILE</span><h2>Host preferences</h2></div>
+          <span id="account-email" class="host-email"></span>
+        </div>
+        <form id="profile-form">
+          <div class="avatar-editor">
+            <div id="avatar-preview" class="avatar-preview"><span id="avatar-initials">?</span><img id="avatar-image" alt="Your profile picture" hidden></div>
+            <div class="avatar-actions">
+              <label class="small-label" for="avatar-file">PROFILE PICTURE</label>
+              <input id="avatar-file" class="avatar-file" type="file" accept="image/jpeg,image/png,image/gif,image/webp">
+              <button id="remove-avatar" class="text-button" type="button" hidden>Remove picture</button>
+              <p id="avatar-status" class="inline-status" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+          <label for="display-name">DISPLAY NAME</label>
+          <input id="display-name" maxlength="20" autocomplete="nickname" placeholder="How guests will see you" required>
+          <p class="field-help">Used as your host name in every auction.</p>
+          <label for="venmo-link">VENMO LINK <span>(OPTIONAL)</span></label>
+          <input id="venmo-link" type="url" maxlength="2048" placeholder="https://venmo.com/u/yourname">
+          <p class="field-help">Shown to the winning bidder at the end of your auctions.</p>
+          <button id="save-profile" class="button dark" type="submit">Save preferences <i data-lucide="arrow-up-right"></i></button>
+          <p id="profile-status" class="inline-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <section class="host-lots-panel">
+        <div class="host-panel-heading">
+          <div><span class="section-number">02 / YOUR HISTORY</span><h2>Past lots</h2></div>
+          <button id="download-lots" class="button primary" type="button" disabled><i data-lucide="download"></i> Download CSV</button>
+        </div>
+        <p id="lots-empty" class="lots-empty" hidden>No completed lots yet. Your hosted auctions will appear here.</p>
+        <div id="auction-groups"></div>
+      </section>
+    </div>
+    <section id="admin-panel" class="admin-panel" hidden>
+      <span class="section-number">03 / SITE ADMINISTRATION</span>
+      <h2>Site management</h2>
+      <div class="admin-grid">
+        <form id="admin-settings-form">
+          <h3>Site availability</h3>
+          <label for="admin-banner">SITE-WIDE BANNER</label>
+          <textarea id="admin-banner" maxlength="500" placeholder="Let everyone know about upcoming maintenance"></textarea>
+          <label class="admin-option"><input id="admin-banner-enabled" type="checkbox"> Show banner to everyone</label>
+          <label class="admin-option"><input id="admin-registration" type="checkbox"> Allow invited hosts to register</label>
+          <label class="admin-option"><input id="admin-maintenance" type="checkbox"> Maintenance mode: block new rooms and joins; existing players can continue and reconnect</label>
+          <button class="button dark" type="submit">Save site settings</button>
+          <p id="admin-settings-status" class="inline-status" role="status"></p>
+        </form>
+        <div>
+          <h3>Host access</h3>
+          <p class="field-help">Add an email to create a single-use invitation code. Share it privately with that host. Disabling access also signs out an existing account; re-enabling restores it.</p>
+          <form id="admin-access-form">
+            <label for="admin-email">HOST EMAIL</label>
+            <input id="admin-email" type="email" maxlength="254" required placeholder="host@example.com">
+            <button class="button dark" type="submit">Add or enable access</button>
+          </form>
+          <p id="admin-access-status" class="inline-status" role="status"></p>
+          <div id="admin-invite-result" hidden>
+            <label for="admin-invite-code">INVITATION CODE</label>
+            <input id="admin-invite-code" type="text" readonly>
+            <p id="admin-invite-detail" class="field-help"></p>
+          </div>
+          <ul id="admin-users" class="admin-users"></ul>
+        </div>
+        <div>
+          <h3>Site activity</h3>
+          <p class="field-help">Active rooms and connected players are for this server instance. Saved lots reflect current records.</p>
+          <div id="admin-stats" class="admin-stats"></div>
+          <button id="admin-refresh" class="button auction-download" type="button">Refresh activity</button>
+        </div>
+      </div>
+      <p id="admin-error" class="form-error" role="alert"></p>
+    </section>
+  </main>
+  <footer class="footer page-width"><span>© GOING ONCE</span><span>MADE FOR THE MOMENTS IN BETWEEN <span class="footer-star">✳</span></span><span>EST. FOR A GOOD TIME</span></footer>
+</body>
+</html>
