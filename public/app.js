@@ -332,6 +332,29 @@ function renderPlayers() {
   });
 }
 
+function csvCell(value) {
+  let text = String(value ?? '');
+  // Stop spreadsheets from running user-entered text as a formula.
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+$('#download-csv').addEventListener('click', () => {
+  const rows = [['Item', 'Description', 'Starting bid', 'Bid increment', 'Winner', 'Winning bid']];
+  [...room.history].reverse().forEach(({ lot, amount, winner }) => {
+    rows.push([lot.name, lot.description, lot.startingBid.toFixed(2), lot.increment.toFixed(2), winner ?? 'No bids', winner ? amount.toFixed(2) : '']);
+  });
+  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  link.download = `going-once-${room.code}-lots.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revoking right away can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+});
+
 function renderHistory() {
   const list = $('#history-list');
   list.replaceChildren();
@@ -339,13 +362,14 @@ function renderHistory() {
     list.append(element('p', 'empty-history', 'The good stuff is still to come.'));
     return;
   }
-  room.history.forEach((entry) => {
+  room.history.slice(0, 10).forEach((entry) => {
     const item = element('div', 'history-item');
     const details = element('div');
     details.append(element('strong', '', entry.lot.name), element('small', '', entry.winner ? `Won by ${entry.winner}` : 'No bids'));
     item.append(details, element('span', 'history-amount', entry.winner ? money.format(entry.amount) : '—'));
     list.append(item);
   });
+  if (room.history.length > 10) list.append(element('p', 'empty-history', `Showing the latest 10 of ${room.history.length} lots.`));
 }
 
 function updateTimer() {
@@ -410,7 +434,7 @@ function render() {
   phaseLabel.lastChild.textContent = room.phase === 'live' ? ' LIVE AUCTION' : room.phase === 'result' ? ' AUCTION CLOSED' : ' WAITING ROOM';
   renderPlayers();
   renderHistory();
-  clearInterval(timerInterval);
+  $('#download-csv').hidden = !host || !room.history.length;  clearInterval(timerInterval);
   if (room.phase !== 'lobby') {
     $('#lot-number').textContent = `LOT ${String(room.round + (room.phase === 'ready' ? 1 : 0)).padStart(2, '0')}`;
     $('#lot-name').textContent = room.lot.name;

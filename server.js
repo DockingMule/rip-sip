@@ -68,7 +68,6 @@ function finishRound(room) {
   room.phase = 'result';
   room.endsAt = null;
   room.history.unshift({ lot: room.lot, amount: room.leaderName ? room.bid : 0, winner: room.leaderName });
-  room.history = room.history.slice(0, 10);
   publish(room);
 }
 

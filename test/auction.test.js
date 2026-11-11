@@ -138,6 +138,12 @@ test('players can join, bid, settle a round, and transfer hosting', async (conte
   assert.equal(room.history[0].winner, 'Guest');
 
   joined = await emit(guest, 'room:join', { name: 'Guest', code: created.code });
+  for (let i = 1; i <= 5; i += 1) {
+    assert.equal((await prepareAndStart(host, { name: `Extra ${i}`, startingBid: 10, autoEnd: false })).ok, true);
+    assert.equal((await new Promise((resolve) => host.emit('round:end', resolve))).ok, true);
+  }
+  assert.equal(room.history.length, 12);
+  assert.equal(room.history.at(-1).lot.name, 'Chair');
   const left = await new Promise((resolve) => host.emit('room:leave', resolve));
   assert.equal(left.ok, true);
   assert.equal(room.hostId, joined.playerId);
