@@ -24,6 +24,14 @@ const stockImages = [
   { name: 'Artwork', photo: 'photo-1579783902614-a3fb3927b6a5' },
   { name: 'Sneakers', photo: 'photo-1542291026-7eec264c27ff' }
 ];
+const stockOptions = [
+  { name: 'No stock image', url: '', thumb: '' },
+  ...stockImages.map(({ name, photo }) => ({
+    name,
+    url: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=1200&q=85`,
+    thumb: `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=300&q=75`
+  }))
+];
 
 try { identity = JSON.parse(localStorage.getItem(savedKey)); } catch { localStorage.removeItem(savedKey); }
 
@@ -79,8 +87,10 @@ socket.on('connect', () => {
 });
 socket.on('disconnect', () => updateConnection(false));
 socket.on('room:update', (data) => {
+  const previous = room;
   room = data;
   render();
+  announceChanges(previous, data);
 });
 
 document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
@@ -225,9 +235,13 @@ function element(tag, className, text) {
 }
 
 function syncStockSelection() {
-  document.querySelectorAll('.stock-image').forEach((button) => {
-    button.setAttribute('aria-pressed', String(button.dataset.url === $('#item-image').value.trim()));
-  });
+  const url = $('#item-image').value.trim();
+  const index = Math.max(0, stockOptions.findIndex((option) => option.url === url));
+  const option = stockOptions[index];
+  $('#stock-current').style.backgroundImage = option.url ? `url("${option.thumb}")` : '';
+  $('#stock-current').classList.toggle('none', !option.url);
+  $('#stock-current-name').textContent = option.url ? option.name : 'Choose a stock image';
+  $('#stock-list').querySelectorAll('li').forEach((item, i) => item.setAttribute('aria-selected', String(i === index)));
 }
 
 function updateImagePreview() {
@@ -251,27 +265,68 @@ function cancelImageUpload() {
   $('#upload-status').textContent = '';
 }
 
-stockImages.forEach(({ name, photo }) => {
-  const url = `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=1200&q=85`;
-  const button = element('button', 'stock-image');
-  button.type = 'button';
-  button.dataset.url = url;
-  button.setAttribute('aria-label', `Use ${name.toLowerCase()} image`);
-  button.setAttribute('aria-pressed', 'false');
-  const image = element('img');
-  image.src = `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=300&q=75`;
-  image.alt = '';
-  image.loading = 'lazy';
-  button.append(image, element('span', '', name));
-  button.addEventListener('click', () => {
-    cancelImageUpload();
-    $('#item-upload').value = '';
-    $('#item-image').value = $('#item-image').value.trim() === url ? '' : url;
-    syncStockSelection();
-    updateImagePreview();
-  });
-  $('#stock-images').append(button);
+const stockButton = $('#stock-button');
+const stockList = $('#stock-list');
+let stockActive = 0;
+
+function setStockActive(index) {
+  stockActive = index;
+  [...stockList.children].forEach((item, i) => item.classList.toggle('active', i === index));
+  stockButton.setAttribute('aria-activedescendant', stockList.children[index].id);
+  stockList.children[index].scrollIntoView({ block: 'nearest' });
+}
+
+function openStock() {
+  stockList.hidden = false;
+  stockButton.setAttribute('aria-expanded', 'true');
+  setStockActive(Math.max(0, stockOptions.findIndex((option) => option.url === $('#item-image').value.trim())));
+}
+
+function closeStock() {
+  stockList.hidden = true;
+  stockButton.setAttribute('aria-expanded', 'false');
+  stockButton.removeAttribute('aria-activedescendant');
+}
+
+function chooseStock(index) {
+  cancelImageUpload();
+  $('#item-upload').value = '';
+  $('#item-image').value = stockOptions[index].url;
+  syncStockSelection();
+  updateImagePreview();
+  closeStock();
+  stockButton.focus();
+}
+
+stockOptions.forEach((option, index) => {
+  const item = element('li');
+  item.id = `stock-option-${index}`;
+  item.setAttribute('role', 'option');
+  const thumb = element('span', option.url ? 'stock-thumb' : 'stock-thumb none');
+  if (option.url) thumb.style.backgroundImage = `url("${option.thumb}")`;
+  item.append(thumb, element('span', '', option.name));
+  item.addEventListener('mousedown', (event) => event.preventDefault());
+  item.addEventListener('mouseenter', () => setStockActive(index));
+  item.addEventListener('click', () => chooseStock(index));
+  stockList.append(item);
 });
+
+stockButton.addEventListener('click', () => (stockList.hidden ? openStock() : closeStock()));
+stockButton.addEventListener('keydown', (event) => {
+  const open = !stockList.hidden;
+  const last = stockList.children.length - 1;
+  if (event.key === 'Tab') closeStock();
+  else if (event.key === 'Escape' && open) { event.preventDefault(); closeStock(); }
+  else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (open) chooseStock(stockActive); else openStock(); }
+  else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+    event.preventDefault();
+    if (!open) openStock();
+    else setStockActive(event.key === 'ArrowDown' ? Math.min(last, stockActive + 1) : event.key === 'ArrowUp' ? Math.max(0, stockActive - 1) : event.key === 'Home' ? 0 : last);
+  }
+});
+// Space activates buttons on keyup in some browsers, which would reopen the list we just closed.
+stockButton.addEventListener('keyup', (event) => { if (event.key === ' ') event.preventDefault(); });
+document.addEventListener('click', (event) => { if (!event.target.closest('.stock-dropdown')) closeStock(); });
 $('#item-image').addEventListener('input', () => {
   cancelImageUpload();
   $('#item-upload').value = '';
@@ -373,9 +428,111 @@ function renderHistory() {
 }
 
 function updateTimer() {
-  const seconds = Math.max(0, Math.ceil((room.endsAt - Date.now()) / 1000));
-  $('#timer span').textContent = `00:${String(seconds).padStart(2, '0')}`;
+  const msLeft = Math.max(0, room.endsAt - Date.now());
+  const resetMs = room.lot.addSeconds * 1000;
+  $('#timer span').textContent = `00:${String(Math.ceil(msLeft / 1000)).padStart(2, '0')}`;
+  $('#timer').classList.toggle('critical', msLeft < resetMs);
+  $('#timer').classList.toggle('warning', msLeft >= resetMs && msLeft < 10000);
+  $('#auction-view').classList.toggle('critical', msLeft < resetMs);
 }
+
+function retrigger(node, className) {
+  node.classList.remove(className);
+  void node.offsetWidth;
+  node.classList.add(className);
+}
+
+function announceChanges(previous, current) {
+  if (!previous || previous.code !== current.code || previous.round !== current.round || previous.phase !== 'live' || current.phase !== 'live') return;
+  if (previous.bid === current.bid && previous.leaderId === current.leaderId) return;
+  const mine = current.leaderId === identity.playerId;
+  const outbid = previous.leaderId === identity.playerId && !mine;
+  const banner = $('#bid-banner');
+  banner.textContent = mine ? `You bid ${money.format(current.bid)}` : outbid ? `${current.leaderName} outbid you at ${money.format(current.bid)}` : `${current.leaderName} bid ${money.format(current.bid)}`;
+  banner.classList.toggle('mine', mine);
+  banner.classList.toggle('outbid', outbid);
+  retrigger(banner, 'show');
+  retrigger($('#bid-amount'), 'bump');
+  retrigger($('.bid-area'), 'flash');
+  const addedMs = (current.endsAt ?? 0) - (previous.endsAt ?? 0);
+  if (addedMs >= 100) {
+    $('#time-added').textContent = `+${addedMs >= 1000 ? Math.round(addedMs / 1000) : (addedMs / 1000).toFixed(1)}s`;
+    retrigger($('#time-added'), 'show');
+    retrigger($('#timer'), 'boost');
+  }
+}
+
+let confetti = null;
+
+function stopConfetti() {
+  if (confetti) cancelAnimationFrame(confetti.frame);
+  confetti = null;
+  const canvas = $('#confetti');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function startConfetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  stopConfetti();
+  const canvas = $('#confetti');
+  const ctx = canvas.getContext('2d');
+  const ratio = window.devicePixelRatio || 1;
+  const width = innerWidth;
+  const height = innerHeight;
+  canvas.width = width * ratio;
+  canvas.height = height * ratio;
+  ctx.scale(ratio, ratio);
+  const colors = ['#c9ef74', '#eb7951', '#f2c94c', '#8eaf43', '#27342c', '#ffffff'];
+  let pieces = [];
+  const piece = (x, y, vx, vy) => ({ x, y, vx, vy, w: 6 + Math.random() * 6, h: 5 + Math.random() * 5, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, color: colors[Math.floor(Math.random() * colors.length)] });
+  const burst = (x, angle) => {
+    for (let i = 0; i < 70; i += 1) {
+      const direction = angle + (Math.random() - 0.5) * 0.9;
+      const speed = 9 + Math.random() * 10;
+      pieces.push(piece(x, height, Math.cos(direction) * speed, Math.sin(direction) * speed));
+    }
+  };
+  burst(0, -Math.PI / 3);
+  burst(width, (-2 * Math.PI) / 3);
+  const start = performance.now();
+  let last = start;
+  let secondBurst = false;
+  const frame = (now) => {
+    const step = Math.min(32, now - last) / 16.7;
+    last = now;
+    const elapsed = now - start;
+    if (!secondBurst && elapsed > 900) {
+      secondBurst = true;
+      burst(0, -Math.PI / 3);
+      burst(width, (-2 * Math.PI) / 3);
+    }
+    if (elapsed < 2600) for (let i = 0; i < 2; i += 1) pieces.push(piece(Math.random() * width, -10, (Math.random() - 0.5) * 2, 2 + Math.random() * 3));
+    ctx.clearRect(0, 0, width, height);
+    pieces = pieces.filter((p) => p.y < height + 20);
+    pieces.forEach((p) => {
+      p.vy += 0.35 * step;
+      p.vx *= 0.992;
+      p.x += p.vx * step;
+      p.y += p.vy * step;
+      p.rot += p.vr * step;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.scale(1, Math.cos(p.rot * 2));
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+    if (pieces.length || elapsed < 2600) confetti.frame = requestAnimationFrame(frame);
+    else stopConfetti();
+  };
+  confetti = { frame: requestAnimationFrame(frame) };
+}
+
+// The close event fires asynchronously, so skip it if the dialog was reopened meanwhile.
+$('#result-dialog').addEventListener('close', () => {
+  if (!$('#result-dialog').open) stopConfetti();
+});
 
 function showResult() {
   const dialog = $('#result-dialog');
@@ -393,17 +550,21 @@ function showResult() {
   if (venmo.hidden) venmo.removeAttribute('href');
   else venmo.href = room.venmoLink;
   if (!result.winner) {
+    dialog.dataset.outcome = 'none';
     $('#result-title').textContent = 'No bids this time';
     $('#result-detail').textContent = `${result.lot.name} ended without a winner.`;
   } else if (room.leaderId === identity.playerId) {
+    dialog.dataset.outcome = 'win';
     $('#result-title').textContent = 'You won!';
     $('#result-detail').textContent = `You won ${result.lot.name} for ${money.format(result.amount)}.`;
   } else {
+    dialog.dataset.outcome = 'lose';
     $('#result-title').textContent = "You didn't win";
     $('#result-detail').textContent = `${result.winner} won ${result.lot.name} for ${money.format(result.amount)}.`;
   }
   lastResult = key;
   dialog.showModal();
+  if (dialog.dataset.outcome === 'win') startConfetti();
 }
 
 function render() {
@@ -434,7 +595,8 @@ function render() {
   phaseLabel.lastChild.textContent = room.phase === 'live' ? ' LIVE AUCTION' : room.phase === 'result' ? ' AUCTION CLOSED' : ' WAITING ROOM';
   renderPlayers();
   renderHistory();
-  $('#download-csv').hidden = !host || !room.history.length;  clearInterval(timerInterval);
+  $('#download-csv').hidden = !host || !room.history.length;
+  clearInterval(timerInterval);
   if (room.phase !== 'lobby') {
     $('#lot-number').textContent = `LOT ${String(room.round + (room.phase === 'ready' ? 1 : 0)).padStart(2, '0')}`;
     $('#lot-name').textContent = room.lot.name;
@@ -446,6 +608,8 @@ function render() {
     image.onerror = () => { image.hidden = true; placeholder.hidden = false; };
     if (room.lot.image && image.getAttribute('src') !== room.lot.image) image.src = room.lot.image;
     $('#timer').hidden = room.phase !== 'live' || room.endsAt === null;
+    $('#timer').classList.remove('warning', 'critical');
+    $('#auction-view').classList.remove('critical');
     if (room.phase === 'live' && room.endsAt !== null) { updateTimer(); timerInterval = setInterval(updateTimer, 250); }
     const leader = room.players.find((player) => player.id === room.leaderId);
     const leaderName = room.leaderName || leader?.name;

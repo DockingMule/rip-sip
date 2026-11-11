@@ -23,15 +23,18 @@
     .ready-actions { margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .ready-actions .button { min-height: 43px; }
     .ready-note { color: var(--muted); font-size: 12px; margin: 20px 0 0; }
-    .stock-picker { border: 0; padding: 0; margin: 0; min-width: 0; }
-    .stock-picker legend { padding: 0; margin-bottom: 9px; color: #4d554c; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
-    .stock-picker legend span { color: #a1a59b; font-weight: 500; }
-    .stock-images { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .stock-image { min-width: 0; padding: 0; border: 2px solid transparent; border-radius: 3px; background: #fff; text-align: left; overflow: hidden; }
-    .stock-image[aria-pressed="true"] { border-color: #547044; }
-    .stock-image img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: #dce5d8; }
-    .stock-image span { display: block; padding: 7px 8px; font-size: 11px; font-weight: 700; color: #596254; }
     .image-upload { height: auto; padding: 8px; font-size: 12px; }
+    .stock-dropdown { position: relative; }
+    .stock-button { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 12px; padding: 4px 14px 4px 4px; background: #fff; border: 1px solid #dddfd7; border-radius: 3px; color: var(--ink); text-align: left; }
+    .stock-button::after { content: ''; flex: none; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid #697664; border-bottom: 2px solid #697664; transform: rotate(45deg) translateY(-2px); }
+    .stock-button[aria-expanded="true"]::after { transform: rotate(-135deg) translateY(-2px); }
+    .stock-thumb { flex: none; width: 56px; height: 40px; border-radius: 2px; background: #dce5d8 center / cover no-repeat; }
+    .stock-thumb.none { background: repeating-linear-gradient(45deg, #eef0ea, #eef0ea 6px, #e4e8de 6px, #e4e8de 12px); }
+    .stock-list { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); max-height: 320px; overflow-y: auto; margin: 0; padding: 4px; list-style: none; background: #fff; border: 1px solid #cfd3c8; border-radius: 3px; box-shadow: 0 12px 30px rgba(32, 36, 31, .18); }
+    .stock-list li { display: flex; align-items: center; gap: 12px; padding: 6px; border-radius: 2px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .stock-list li.active { background: #edf3e6; }
+    .stock-list li[aria-selected="true"] { box-shadow: inset 3px 0 0 #547044; }
+    .stock-list .stock-thumb { width: 72px; height: 48px; }
     .image-upload::file-selector-button { border: 0; border-radius: 2px; padding: 8px 10px; margin-right: 10px; background: var(--dark); color: white; font: 700 11px var(--font); cursor: pointer; }
     .upload-status { margin: 7px 0 0; color: #697664; font-size: 11px; overflow-wrap: anywhere; }
     .image-preview { display: block; width: min(100%, 220px); max-height: 150px; margin-top: 10px; object-fit: contain; object-position: left; }
@@ -47,6 +50,63 @@
     .leave-dialog-actions { display: flex; gap: 10px; }
     .leave-dialog-actions .button { flex: 1; justify-content: center; }
     .result-dialog .form-error { color: #b34f35; margin: 12px 0 0; }
+    .timer { transform-origin: top right; transition: transform .25s ease, background-color .25s ease, color .25s ease; }
+    .timer.warning { transform: scale(1.5); color: #b4401f; }
+    .timer.critical { transform: scale(2.4); background: #c93a1f; color: #fff; }
+    .timer::after { content: ''; position: absolute; inset: -3px; border: 3px solid #2f8f43; opacity: 0; pointer-events: none; }
+    .time-added { position: absolute; top: calc(100% + 6px); right: 0; padding: 4px 8px; background: #2f8f43; color: #fff; font: 700 13px var(--display); letter-spacing: 0; white-space: nowrap; opacity: 0; }
+    .time-added.show { animation: fade-notice 1.8s forwards; }
+    .bid-banner { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 11px 16px; background: var(--dark); color: #fff; font: 700 14px/1.3 var(--display); text-align: center; overflow-wrap: anywhere; opacity: 0; pointer-events: none; }
+    .bid-banner.mine { background: #2f8f43; }
+    .bid-banner.outbid { background: #c93a1f; }
+    .bid-banner.show { animation: fade-notice 2.6s forwards; }
+    #bid-amount { display: inline-block; transform-origin: left center; }
+    @keyframes fade-notice { 0% { opacity: 0; } 6% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+    #confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1; }
+    .result-art { display: none; width: min(100%, 240px); margin: -6px auto 10px; }
+    .result-dialog[data-outcome="lose"] { background: #dfe2dd; color: #4a4f48; }
+    .result-dialog[data-outcome="lose"] .result-dialog-icon { display: none; }
+    .result-dialog[data-outcome="lose"] .result-art { display: block; }
+    .result-dialog[data-outcome="lose"] h2 { color: #5b6159; }
+    .result-dialog[data-outcome="lose"] p { color: #6b7068; }
+    .result-dialog[data-outcome="win"] { background: linear-gradient(160deg, #fffbe6, #f6f5f0 55%, #e7f6c0); box-shadow: 0 0 0 3px #f2c94c, 0 20px 60px rgba(242, 201, 76, .45); }
+    .result-dialog[data-outcome="win"] .result-dialog-icon { background: #f2c94c; width: 64px; height: 64px; }
+    .result-dialog[data-outcome="win"] .result-dialog-icon svg { width: 30px; }
+    .result-dialog[data-outcome="win"] h2 { font-size: 44px; background: linear-gradient(90deg, #3f6b12, #e0a800, #3f6b12); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .sad-figure .figure { stroke: #4a4f48; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .kick-leg { transform-origin: 100px 112px; transform: rotate(-25deg); }
+    .dust, .pebble { transform-box: fill-box; transform-origin: center; }
+    .dust { fill: #b4b8ad; opacity: 0; }
+    @media (max-width: 650px) { .timer.warning { transform: scale(1.35); } .timer.critical { transform: scale(1.9); } }
+    @media (prefers-reduced-motion: no-preference) {
+      .timer.critical { animation: timer-flash .7s ease-in-out infinite; }
+      .timer.boost::after { animation: timer-ring .9s ease-out; }
+      .time-added.show { animation: time-added 1.8s ease-out forwards; }
+      .bid-banner.show { animation: bid-banner 2.6s ease forwards; }
+      .bump { animation: bid-bump .6s ease-out; }
+      .bid-area.flash { animation: bid-area-flash 1s ease-out; }
+      .auction-view.critical { animation: card-alert .7s ease-in-out infinite; }
+      .result-dialog[data-outcome="win"] .result-dialog-icon { animation: gavel-bang 1s ease-in-out infinite; }
+      .result-dialog[data-outcome="win"] h2 { animation: win-pop .7s cubic-bezier(.2, 1.6, .4, 1), shimmer 2.2s linear infinite; }
+      .kick-leg { animation: kick 1.6s ease-in-out infinite; }
+      .dust { animation: dust 1.6s ease-out infinite; }
+      .dust.d2 { animation-delay: .08s; }
+      .dust.d3 { animation-delay: .16s; }
+      .pebble { animation: pebble 1.6s ease-in infinite; }
+      @keyframes timer-flash { 0%, 100% { background: #c93a1f; color: #fff; box-shadow: 0 0 0 0 rgba(201, 58, 31, .7); } 50% { background: #fff; color: #c93a1f; box-shadow: 0 0 0 10px rgba(201, 58, 31, 0); } }
+      @keyframes timer-ring { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.7); } }
+      @keyframes time-added { 0% { opacity: 0; transform: translateY(-6px) scale(.8); } 15% { opacity: 1; transform: translateY(0) scale(1.15); } 70% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(8px); } }
+      @keyframes bid-banner { 0% { opacity: 0; transform: translate(-50%, 24px) scale(.9); } 8% { opacity: 1; transform: translate(-50%, 0) scale(1.05); } 14% { transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -6px); } }
+      @keyframes bid-bump { 0%, 100% { transform: scale(1); color: var(--ink); } 35% { transform: scale(1.35); color: #2f8f43; } }
+      @keyframes bid-area-flash { from { background: #e3f4df; } to { background: rgba(227, 244, 223, 0); } }
+      @keyframes card-alert { 0%, 100% { box-shadow: 0 0 0 0 rgba(201, 58, 31, 0); } 50% { box-shadow: 0 0 0 5px rgba(201, 58, 31, .5); } }
+      @keyframes gavel-bang { 0%, 100% { transform: rotate(-25deg); } 50% { transform: rotate(15deg); } }
+      @keyframes win-pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      @keyframes shimmer { to { background-position: -200% 0; } }
+      @keyframes kick { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(14deg); } 45% { transform: rotate(-52deg); } 65% { transform: rotate(-6deg); } 80% { transform: rotate(0); } }
+      @keyframes dust { 0%, 35% { opacity: 0; transform: translate(0, 0) scale(.4); } 50% { opacity: .85; } 100% { opacity: 0; transform: translate(22px, -24px) scale(1.6); } }
+      @keyframes pebble { 0%, 40% { transform: translate(0, 0); opacity: 1; } 60% { transform: translate(28px, -34px); } 80% { transform: translate(58px, 0); opacity: 1; } 90%, 100% { transform: translate(58px, 0); opacity: 0; } }
+    }
     @media (max-width: 900px) { .welcome h1 { font-size: 58px; } }
     @media (max-width: 650px) { .welcome h1 { font-size: 48px; } }
     @media (max-width: 380px) { .welcome h1 { font-size: 42px; } }
@@ -98,20 +158,38 @@
           <div class="section-heading"><div><span class="section-number">01 / THE MAIN EVENT</span><h2 id="main-heading">The auction block</h2></div><span class="phase-pill" id="phase-label"><span></span> WAITING ROOM</span></div>
           <div id="lobby-view" class="lobby-view"><div class="lobby-icon"><i data-lucide="gavel"></i></div><span class="small-label">THE FLOOR IS YOURS</span><h3>Every great find<br>starts here.</h3><p id="lobby-message">Your host is getting the first item ready. Grab your friends and settle in.</p><div class="lobby-line"></div><span class="lobby-bottom">GOOD COMPANY. GREAT BIDS.</span></div>
           <div id="auction-view" class="auction-view" hidden>
-            <div class="lot-image-wrap"><img id="lot-image" alt=""><div id="image-placeholder" class="image-placeholder"><i data-lucide="package-open"></i></div><div class="lot-badge" id="lot-number">LOT 01</div><div id="timer" class="timer"><i data-lucide="clock-3"></i><span>00:30</span></div></div>
+            <div class="lot-image-wrap"><img id="lot-image" alt=""><div id="image-placeholder" class="image-placeholder"><i data-lucide="package-open"></i></div><div class="lot-badge" id="lot-number">LOT 01</div><div id="timer" class="timer"><i data-lucide="clock-3"></i><span>00:30</span><b id="time-added" class="time-added" aria-hidden="true"></b></div><div id="bid-banner" class="bid-banner" role="status" aria-live="polite"></div></div>
             <div class="lot-details"><div class="lot-title-row"><div><span class="small-label">UP FOR GRABS</span><h3 id="lot-name"></h3><p id="lot-description"></p></div><span class="asterisk">✳</span></div><div class="bid-area"><div><span class="small-label" id="bid-label">STARTING BID</span><div class="bid-value"><span id="bid-amount">$0.00</span></div><p id="bid-leader">Be the first to make a move.</p><p id="bid-increment"></p></div><div id="bid-controls"><label class="sr-only" for="bid-input">Your bid in dollars</label><div class="bid-input-wrap"><span aria-hidden="true">$</span><input type="number" id="bid-input" min="0.01" step="0.01" inputmode="decimal"></div><button id="bid-button" class="button primary">Place bid <i data-lucide="arrow-up-right"></i></button></div></div><p class="form-error" id="bid-error" role="alert"></p><div id="result-message" class="result-message" hidden></div></div>
           </div>
           <p id="ready-note" class="ready-note" hidden>Waiting for the host to start the auction.</p>
           <div id="ready-host-actions" class="ready-actions" hidden><button id="start-auction-button" class="button dark" type="button">Start auction <i data-lucide="arrow-up-right"></i></button><button id="edit-lot-button" class="button" type="button">Edit item <i data-lucide="pencil"></i></button><p class="form-error" id="start-error" role="alert"></p></div>
           <div id="live-host-actions" class="live-host-actions" hidden><span>Host controls</span><button id="end-button" class="button dark" type="button">End auction <i data-lucide="gavel"></i></button><p class="form-error" id="end-error" role="alert"></p></div>
-          <section id="host-panel" class="host-panel" hidden><div class="panel-title"><div><span class="section-number">HOST CONTROLS</span><h2 id="host-heading">Put something up for bid</h2></div><i data-lucide="sparkles"></i></div><form id="lot-form"><div class="form-grid"><div class="full"><label for="item-name">ITEM NAME</label><input id="item-name" maxlength="60" placeholder="e.g. The last slice of pizza" required></div><div><label for="starting-bid">STARTING BID <span>($)</span></label><input id="starting-bid" type="number" min="0.01" max="1000000000000" step="0.01" value="50" required></div><div><label for="bid-step">BID INCREMENT <span>($)</span></label><input id="bid-step" type="number" min="0.01" max="1000000000000" step="0.01" value="10" required></div><div class="full"><label for="item-description">DESCRIPTION <span>(OPTIONAL)</span></label><input id="item-description" maxlength="160" placeholder="Give it a little backstory"></div><fieldset class="stock-picker full"><legend>STOCK IMAGES <span>(OPTIONAL)</span></legend><div id="stock-images" class="stock-images"></div></fieldset><div class="full"><label for="item-upload">UPLOAD IMAGE <span>(JPEG, PNG, GIF, WEBP; MAX 5 MB)</span></label><input id="item-upload" class="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><p id="upload-status" class="upload-status" role="status" aria-live="polite"></p></div><div class="full"><label for="item-image">IMAGE URL <span>(OPTIONAL)</span></label><input id="item-image" type="text" inputmode="url" maxlength="1000" placeholder="https://..."><img id="image-preview" class="image-preview" alt="Selected item image" hidden></div></div><label class="auto-end-option"><input id="auto-end" type="checkbox" checked><span>Automatically end the auction when time runs out</span></label><div id="auto-end-times" class="auto-end-times"><div><label for="start-seconds">START TIME</label><select id="start-seconds"><option value="30" selected>30 seconds</option><option value="20">20 seconds</option><option value="15">15 seconds</option></select></div><div><label for="add-seconds">TIME ADDED PER BID</label><select id="add-seconds"><option value="10" selected>10 seconds</option><option value="7">7 seconds</option><option value="5">5 seconds</option></select></div></div><div class="host-actions"><span>The host can end the auction at any time</span><button class="button dark" id="prepare-button" type="submit">Prepare item <i data-lucide="arrow-up-right"></i></button></div><p class="form-error" id="host-error" role="alert"></p></form></section>
+          <section id="host-panel" class="host-panel" hidden><div class="panel-title"><div><span class="section-number">HOST CONTROLS</span><h2 id="host-heading">Put something up for bid</h2></div><i data-lucide="sparkles"></i></div><form id="lot-form"><div class="form-grid"><div class="full"><label for="item-name">ITEM NAME</label><input id="item-name" maxlength="60" placeholder="e.g. The last slice of pizza" required></div><div><label for="starting-bid">STARTING BID <span>($)</span></label><input id="starting-bid" type="number" min="0.01" max="1000000000000" step="0.01" value="50" required></div><div><label for="bid-step">BID INCREMENT <span>($)</span></label><input id="bid-step" type="number" min="0.01" max="1000000000000" step="0.01" value="10" required></div><div class="full"><label for="item-description">DESCRIPTION <span>(OPTIONAL)</span></label><input id="item-description" maxlength="160" placeholder="Give it a little backstory"></div><div class="full stock-dropdown"><label for="stock-button">STOCK IMAGE <span>(OPTIONAL)</span></label><button type="button" id="stock-button" class="stock-button" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="stock-list"><span id="stock-current" class="stock-thumb none"></span><span id="stock-current-name">Choose a stock image</span></button><ul id="stock-list" class="stock-list" role="listbox" aria-label="Stock images" hidden></ul></div><div class="full"><label for="item-upload">UPLOAD IMAGE <span>(JPEG, PNG, GIF, WEBP; MAX 5 MB)</span></label><input id="item-upload" class="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><p id="upload-status" class="upload-status" role="status" aria-live="polite"></p></div><div class="full"><label for="item-image">IMAGE URL <span>(OPTIONAL)</span></label><input id="item-image" type="text" inputmode="url" maxlength="1000" placeholder="https://..."><img id="image-preview" class="image-preview" alt="Selected item image" hidden></div></div><label class="auto-end-option"><input id="auto-end" type="checkbox" checked><span>Automatically end the auction when time runs out</span></label><div id="auto-end-times" class="auto-end-times"><div><label for="start-seconds">START TIME</label><select id="start-seconds"><option value="30" selected>30 seconds</option><option value="20">20 seconds</option><option value="15">15 seconds</option></select></div><div><label for="add-seconds">TIME ADDED PER BID</label><select id="add-seconds"><option value="10" selected>10 seconds</option><option value="7">7 seconds</option><option value="5">5 seconds</option></select></div></div><div class="host-actions"><span>The host can end the auction at any time</span><button class="button dark" id="prepare-button" type="submit">Prepare item <i data-lucide="arrow-up-right"></i></button></div><p class="form-error" id="host-error" role="alert"></p></form></section>
         </div>
         <aside class="game-sidebar"><div class="players-panel"><div class="sidebar-title"><div><span class="section-number">02 / THE PEOPLE</span><h2>In the room <span id="player-count">0</span></h2></div><i data-lucide="users-round"></i></div><div id="players-list" class="players-list"></div></div><div class="history-panel"><div class="sidebar-title"><div><span class="section-number">03 / THE RECAP</span><h2>Past lots</h2></div><i data-lucide="history"></i></div><div id="history-list" class="history-list"><p class="empty-history">The good stuff is still to come.</p></div><button id="download-csv" class="leave-button" type="button" hidden><i data-lucide="download"></i> Download CSV</button></div><div class="sidebar-note"><span>THE ONLY RULE?</span><strong>Have a little fun with it.</strong><i data-lucide="smile"></i></div><button id="leave-button" class="leave-button"><i data-lucide="log-out"></i> Leave room</button></aside>
       </div>
     </section>
   </main>
   <dialog id="result-dialog" class="result-dialog" aria-labelledby="result-title" aria-describedby="result-detail">
+    <canvas id="confetti" aria-hidden="true"></canvas>
     <div class="result-dialog-icon" aria-hidden="true"><i data-lucide="gavel"></i></div>
+    <svg class="result-art sad-figure" viewBox="0 0 240 170" role="img" aria-label="A disappointed person kicking the ground">
+      <path d="M12 152H228" stroke="#9aa095" stroke-width="3" stroke-linecap="round" fill="none"/>
+      <g class="figure" stroke-width="7">
+        <path d="M100 112L98 150L108 150"/>
+        <g class="kick-leg"><path d="M100 112L100 148L111 150"/></g>
+        <path d="M110 74Q106 96 100 112"/>
+        <path d="M110 78Q113 94 106 108" stroke-width="5"/>
+        <path d="M108 80Q99 94 100 106" stroke-width="5"/>
+        <circle cx="123" cy="60" r="16" fill="#e9ebe6" stroke-width="5"/>
+        <path d="M128 57H134" stroke-width="2.5"/>
+        <path d="M126 69Q132 65 138 69" stroke-width="2.5"/>
+      </g>
+      <circle class="dust d1" cx="113" cy="147" r="5"/>
+      <circle class="dust d2" cx="118" cy="143" r="4"/>
+      <circle class="dust d3" cx="108" cy="146" r="3.5"/>
+      <circle class="pebble" cx="120" cy="147" r="3" fill="#7d8277"/>
+    </svg>
     <span class="section-number">AUCTION ENDED</span>
     <h2 id="result-title"></h2>
     <p id="result-detail"></p>
