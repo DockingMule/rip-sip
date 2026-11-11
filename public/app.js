@@ -49,6 +49,7 @@ function resetRoom() {
   lastImageDefault = null;
   cancelImageUpload();
   lotForm.reset();
+  syncAutoEndOptions();
   syncStockSelection();
   updateImagePreview();
   if ($('#result-dialog').open) $('#result-dialog').close();
@@ -118,7 +119,7 @@ lotForm.addEventListener('submit', (event) => {
   if (!socket.connected) return errorAt('#host-error', 'Not connected to the server. Please try again.');
   const button = $('#prepare-button');
   button.disabled = true;
-  socket.timeout(5000).emit('round:prepare', { name: $('#item-name').value, description: $('#item-description').value, image: $('#item-image').value, startingBid: $('#starting-bid').value, increment: $('#bid-step').value, autoEnd: $('#auto-end').checked }, (error, response) => {
+  socket.timeout(5000).emit('round:prepare', { name: $('#item-name').value, description: $('#item-description').value, image: $('#item-image').value, startingBid: $('#starting-bid').value, increment: $('#bid-step').value, autoEnd: $('#auto-end').checked, startSeconds: Number($('#start-seconds').value), addSeconds: Number($('#add-seconds').value) }, (error, response) => {
     button.disabled = false;
     if (error) return errorAt('#host-error', 'The server did not respond. Refresh the page and try again.');
     if (response.error) return errorAt('#host-error', response.error);
@@ -133,9 +134,6 @@ $('#start-auction-button').addEventListener('click', () => {
     if (response.error) return errorAt('#start-error', response.error);
     editingLot = false;
     cancelImageUpload();
-    lotForm.reset();
-    syncStockSelection();
-    updateImagePreview();
   });
 });
 
@@ -143,14 +141,28 @@ $('#edit-lot-button').addEventListener('click', () => {
   editingLot = true;
   $('#item-name').value = room.lot.name;
   $('#item-description').value = room.lot.description;
-  $('#item-image').value = room.lot.image;
-  syncStockSelection();
-  updateImagePreview();
-  $('#starting-bid').value = room.lot.startingBid;
-  $('#bid-step').value = room.lot.increment;
-  $('#auto-end').checked = room.lot.autoEnd;
+  fillLotSettings(room.lot);
   render();
 });
+
+function fillLotSettings(lot) {
+  $('#item-image').value = lot.image;
+  $('#starting-bid').value = lot.startingBid;
+  $('#bid-step').value = lot.increment;
+  $('#auto-end').checked = lot.autoEnd;
+  $('#start-seconds').value = lot.startSeconds;
+  $('#add-seconds').value = lot.addSeconds;
+  $('#item-upload').value = '';
+  syncAutoEndOptions();
+  syncStockSelection();
+  updateImagePreview();
+}
+
+$('#auto-end').addEventListener('change', syncAutoEndOptions);
+
+function syncAutoEndOptions() {
+  $('#auto-end-times').hidden = !$('#auto-end').checked;
+}
 
 $('#end-button').addEventListener('click', () => {
   errorAt('#end-error');
@@ -377,9 +389,9 @@ function render() {
   const host = me.id === room.hostId;
   const resultKey = `${room.code}:${room.round}`;
   if (host && room.phase === 'result' && lastImageDefault !== resultKey) {
-    $('#item-image').value = room.lot.image;
-    syncStockSelection();
-    updateImagePreview();
+    fillLotSettings(room.lot);
+    $('#item-name').value = '';
+    $('#item-description').value = '';
     lastImageDefault = resultKey;
   }
   welcome.hidden = true;

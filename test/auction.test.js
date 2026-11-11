@@ -65,7 +65,7 @@ test('players can join, bid, settle a round, and transfer hosting', async (conte
   assert.ok(room.endsAt > Date.now());
   room.endsAt = Date.now() + 1000;
   assert.equal((await emit(guest, 'bid:place', { amount: 50 })).ok, true);
-  assert.ok(room.endsAt > Date.now() + 28000);
+  assert.ok(room.endsAt > Date.now() + 8000);
   const deadline = room.endsAt;
   assert.match((await emit(host, 'bid:place', { amount: 55 })).error, /at least \$60/i);
   assert.equal(room.endsAt, deadline);
@@ -77,6 +77,19 @@ test('players can join, bid, settle a round, and transfer hosting', async (conte
   assert.equal(room.history[0].amount, 1010);
   assert.equal(room.history[0].winner, 'Host');
   assert.match((await emit(guest, 'bid:place', { amount: 70 })).error, /not accepting/i);
+
+  assert.match((await emit(host, 'round:prepare', { name: 'Timer', startingBid: 10, startSeconds: 25 })).error, /start time/i);
+  assert.match((await emit(host, 'round:prepare', { name: 'Timer', startingBid: 10, addSeconds: 3 })).error, /bid time/i);
+  assert.equal((await prepareAndStart(host, { name: 'Timer', startingBid: 10, startSeconds: 15, addSeconds: 7 })).ok, true);
+  assert.ok(room.endsAt > Date.now() + 14000 && room.endsAt <= Date.now() + 15000);
+  room.endsAt = Date.now() + 8000;
+  const unchanged = room.endsAt;
+  assert.equal((await emit(guest, 'bid:place', { amount: 10 })).ok, true);
+  assert.equal(room.endsAt, unchanged);
+  room.endsAt = Date.now() + 6000;
+  assert.equal((await emit(host, 'bid:place', { amount: 20 })).ok, true);
+  assert.ok(room.endsAt > Date.now() + 6500 && room.endsAt <= Date.now() + 7000);
+  assert.equal((await new Promise((resolve) => host.emit('round:end', resolve))).ok, true);
 
   assert.match((await emit(host, 'round:prepare', { name: 'Clock', startingBid: 10, increment: 0 })).error, /increment/i);
   assert.match((await emit(host, 'round:prepare', { name: 'Clock', startingBid: 10, increment: 0.001 })).error, /increment/i);

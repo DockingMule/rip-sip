@@ -1,6 +1,6 @@
 # Going Once
 
-A real-time auction party game for phones and desktops. One player creates a room and shares its code. The host can optionally add a Venmo link when creating the room; the winner can open it from the result popup. The host prepares an item and sets the dollar bid increment (down to $0.01). Players can join and see the item before the host starts the auction. The host can end it at any time. Bids must follow the increment from the starting price. The host can also enable automatic closing after 30 seconds without a bid; the countdown starts when the auction begins and resets after each accepted bid. The highest bidder wins. The app does not process or verify payments.
+A real-time auction party game for phones and desktops. One player creates a room and shares its code. The host can optionally add a Venmo link when creating the room; the winner can open it from the result popup. The host prepares an item and sets the dollar bid increment (down to $0.01). Players can join and see the item before the host starts the auction. The host can end it at any time. Bids must follow the increment from the starting price. The host can also enable automatic closing with a start time (30, 20, or 15 seconds) and a bid time add (10, 7, or 5 seconds); a bid tops the clock back up to the bid time add only if less time than that remains. The highest bidder wins. The app does not process or verify payments.
 
 ## Run locally
 

@@ -11,7 +11,8 @@ const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_AMOUNT_CENTS = 100000000000000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_ROOM_IMAGE_BYTES = 64 * 1024 * 1024;
-const ROUND_SECONDS = 30;
+const START_SECONDS = [30, 20, 15];
+const ADD_SECONDS = [10, 7, 5];
 
 app.use(express.static('public'));
 
@@ -51,10 +52,10 @@ function publish(room) {
   io.to(room.code).emit('room:update', publicRoom(room));
 }
 
-function resetRoundTimer(room) {
+function setRoundTimer(room, seconds) {
   clearTimeout(room.timer);
-  room.endsAt = Date.now() + ROUND_SECONDS * 1000;
-  room.timer = setTimeout(() => finishRound(room), ROUND_SECONDS * 1000);
+  room.endsAt = Date.now() + seconds * 1000;
+  room.timer = setTimeout(() => finishRound(room), seconds * 1000);
 }
 
 function finishRound(room) {
@@ -178,7 +179,7 @@ io.on('connection', (socket) => {
     respond(callback, null, { url });
   });
 
-  socket.on('round:prepare', ({ name, description, image, startingBid, increment = 10, autoEnd = true } = {}, callback) => {
+  socket.on('round:prepare', ({ name, description, image, startingBid, increment = 10, autoEnd = true, startSeconds = 30, addSeconds = 10 } = {}, callback) => {
     const room = getRoom();
     if (!room || socket.data.playerId !== room.hostId) return respond(callback, 'Only the host can prepare an auction.');
     if (room.phase === 'live') return respond(callback, 'The current auction is still live.');
@@ -192,7 +193,9 @@ io.on('connection', (socket) => {
     if (incrementCents === null || incrementCents < 1 || incrementCents > MAX_AMOUNT_CENTS) return respond(callback, 'Bid increment must be between $0.01 and $1 trillion, with at most two decimal places.');
     if (image && !/^https?:\/\//i.test(image) && !room.images.has(image)) return respond(callback, 'Use an uploaded image or a URL starting with http:// or https://.');
     if (typeof autoEnd !== 'boolean') return respond(callback, 'Choose a valid auction ending option.');
-    room.lot = { name, description, image, startingBid: startingCents / 100, increment: incrementCents / 100, autoEnd };
+    if (!START_SECONDS.includes(startSeconds)) return respond(callback, 'Choose a start time of 30, 20, or 15 seconds.');
+    if (!ADD_SECONDS.includes(addSeconds)) return respond(callback, 'Choose a bid time add of 10, 7, or 5 seconds.');
+    room.lot = { name, description, image, startingBid: startingCents / 100, increment: incrementCents / 100, autoEnd, startSeconds, addSeconds };
     room.bid = room.lot.startingBid;
     room.leaderId = null;
     room.leaderName = null;
@@ -208,7 +211,7 @@ io.on('connection', (socket) => {
     if (room.phase !== 'ready') return respond(callback, 'Prepare an item before starting the auction.');
     room.round += 1;
     room.phase = 'live';
-    if (room.lot.autoEnd) resetRoundTimer(room);
+    if (room.lot.autoEnd) setRoundTimer(room, room.lot.startSeconds);
     publish(room);
     respond(callback);
   });
@@ -236,7 +239,8 @@ io.on('connection', (socket) => {
     room.bid = amountCents / 100;
     room.leaderId = player.id;
     room.leaderName = player.name;
-    if (room.lot.autoEnd) resetRoundTimer(room);
+    // A bid only tops the clock back up to the add time; it never extends beyond it.
+    if (room.lot.autoEnd && room.endsAt - Date.now() < room.lot.addSeconds * 1000) setRoundTimer(room, room.lot.addSeconds);
     publish(room);
     respond(callback);
   });
